@@ -1,6 +1,8 @@
-import random
 import json
 import os
+
+from boss import *
+from player import *
 
 
 # Инициализация списков ритуальных предметов
@@ -37,7 +39,7 @@ def generate_artifact_files():
     print("Файлы с ритуальными предметами созданы.")
 
 
-# Создаем файлы при первом запуске
+# Создание файлов при первом запуске
 if not os.path.exists("start_items.txt"):
     generate_artifact_files()
 
@@ -48,7 +50,8 @@ spirit_items = []
 current_item = ""
 visited_locations = set()
 collected_items = []
-game_state = {}  # Для сохранения прогресса
+player = None
+boss = None
 
 
 # Загрузка предметов из файлов
@@ -86,7 +89,9 @@ def save_game():
         "visited_locations": list(visited_locations),
         "moves_log": moves_log,
         "start_items": start_items,
-        "spirit_items": spirit_items
+        "spirit_items": spirit_items,
+        "player_health": player.health if player else 100,
+        "player_name": player.name if player else "Искатель"
     }
 
     try:
@@ -100,7 +105,7 @@ def save_game():
 
 
 def load_game():
-    global current_item, collected_items, visited_locations, moves_log, start_items, spirit_items
+    global current_item, collected_items, visited_locations, moves_log, start_items, spirit_items, player
 
     if not os.path.exists("save_game.json"):
         print("⚠️ Файл сохранения не найден!")
@@ -117,9 +122,17 @@ def load_game():
         start_items = save_data["start_items"]
         spirit_items = save_data["spirit_items"]
 
+        # Восстанавливаем игрока
+        player_name = save_data.get("player_name", "Искатель")
+        player_health = save_data.get("player_health", 100)
+        player = Player(player_name)
+        player.health = player_health
+        player.artifacts = collected_items.copy()
+
         print("✅ Игра успешно загружена!")
-        print(f"📦 Текущий предмет: {current_item}")
-        print(f"📍 Посещенные места: {len(visited_locations)}")
+        print(f"🎮 Игрок: {player.name}")
+        print(f"❤️  Здоровье: {player.health}")
+        print(f"📦 Предметов: {len(collected_items)}")
 
         if visited_locations:
             last_location = list(visited_locations)[-1]
@@ -133,6 +146,9 @@ def load_game():
                 cave_path()
             elif last_location == "Руины храма":
                 temple_ruins()
+            elif last_location == "Финальная битва":
+                # Если сохранение в битве, возвращаем в храм
+                temple_ruins()
             else:
                 beach_choice()
         else:
@@ -145,7 +161,7 @@ def load_game():
 
 
 def discard_progress():
-    global current_item, collected_items, visited_locations, moves_log
+    global current_item, collected_items, visited_locations, moves_log, player
 
     print("\n⚠️ ВНИМАНИЕ: Весь прогресс будет потерян!")
     print(f"Вы потеряете: {len(collected_items)} собранных предметов")
@@ -155,25 +171,14 @@ def discard_progress():
 
     if choice == "да":
         # Возвращаем все артефакты обратно в копилку
-        if current_item and current_item not in start_items:
-            start_items.append(current_item)
-
-        for item in collected_items:
-            if item not in start_items and item not in spirit_items:
-                if item in ["🌊 Ракушка Приливов", "🔥 Огненный Кремень", "🌿 Лист Древнего Древа",
-                            "💎 Глаз Бури", "🐚 Рог Морского Царя", "🌙 Лунный Камень",
-                            "☀️ Солнечный Кристалл", "🌀 Перо Ветров"]:
-                    if item not in start_items:
-                        start_items.append(item)
-                else:
-                    if item not in spirit_items:
-                        spirit_items.append(item)
+        return_items_to_pool()
 
         # Очищаем прогресс
         current_item = ""
         collected_items.clear()
         visited_locations.clear()
         moves_log.clear()
+        player = None
 
         save_items()
 
@@ -189,13 +194,25 @@ def discard_progress():
         return False
 
 
+def return_items_to_pool():
+    for item in collected_items:
+        if item in ["🌊 Ракушка Приливов", "🔥 Огненный Кремень", "🌿 Лист Древнего Древа",
+                    "💎 Глаз Бури", "🐚 Рог Морского Царя", "🌙 Лунный Камень",
+                    "☀️ Солнечный Кристалл", "🌀 Перо Ветров"]:
+            if item not in start_items:
+                start_items.append(item)
+        else:
+            if item not in spirit_items:
+                spirit_items.append(item)
+
+
 def log_move(description):
     moves_log.append(description)
     print(f"📝 {description}")
 
 
 def choose_starting_item():
-    global current_item
+    global current_item, player
     if not start_items:
         print("⚠️ Нет доступных предметов для начала!")
         return False
@@ -203,9 +220,15 @@ def choose_starting_item():
     current_item = random.choice(start_items)
     start_items.remove(current_item)
     collected_items.append(current_item)
-    log_move(f"Вы нашли предмет: {current_item}")
-    print(f"🌀 Вы держите в руках: {current_item}")
-    print("'Древняя энергия пульсирует в этом предмете...'")
+
+    # Создаем игрока
+    player = Player()
+    player.artifacts = collected_items.copy()
+
+    log_move(f"Начальный предмет: {current_item}")
+    print(f"\n🌀 Вы держите в руках: {current_item}")
+    print("💫 'Древняя энергия пульсирует в этом предмете...'")
+    print(f"\n{player.show_stats()}")
     return True
 
 
@@ -215,39 +238,6 @@ def get_valid_input(prompt, valid_options):
         if choice in valid_options:
             return choice
         print("❌ Неверный выбор. Попробуйте снова.")
-
-
-# НОВОЕ: Простая загадка для первого ответвления
-def simple_riddle():
-    print("\n🧠 Дух задает загадку:")
-    print("'Летит без крыльев, плачет без глаз.'")
-
-    answer = input("Что это? ").strip().lower()
-
-    if answer == "облако" or answer == "туча":
-        print("✅ Верно! Это облако.")
-        return True
-    else:
-        print("❌ Неверно! Это облако.")
-        return False
-
-
-# НОВОЕ: Простая игра на угадывание для второго ответвления
-def guess_number():
-    print("\n🎯 Угадай число от 1 до 3!")
-    secret = random.randint(1, 3)
-
-    try:
-        guess = int(input("Твой выбор (1, 2 или 3): "))
-        if guess == secret:
-            print("🎉 Угадал!")
-            return True
-        else:
-            print(f"❌ Не угадал! Было число {secret}.")
-            return False
-    except:
-        print("❌ Нужно ввести число!")
-        return False
 
 
 def show_save_menu(from_location=""):
@@ -285,12 +275,137 @@ def return_to_location(location):
         cave_path()
     elif location == "temple":
         temple_ruins()
-    elif location == "mysterious_path":
-        mysterious_path()
-    elif location == "secret_cave":
-        secret_cave()
     else:
         beach_choice()
+
+
+#сФинальная битва с боссом
+def final_battle():
+    visited_locations.add("Финальная битва")
+
+    global boss
+    boss = Boss("👹 Хранитель Проклятия")
+
+    print("\n" + "=" * 50)
+    print("⚔️ ФИНАЛЬНАЯ БИТВА ⚔️")
+    print("=" * 50)
+    print("Перед вами появляется Хранитель Проклятия!")
+    print("Его сила питается древним проклятием острова.")
+    print("Только победа над ним может освободить остров!")
+
+    input("\nНажмите Enter чтобы начать битву...")
+
+    battle_round = 1
+
+    while player.is_alive() and boss.is_alive():
+        print(f"\n{'=' * 30}")
+        print(f"РАУНД {battle_round}")
+        print(f"{'=' * 30}")
+
+        # Показываем статистику
+        print(player.show_stats())
+        print(boss.show_stats())
+
+        # Ход игрока
+        print(f"\n{player.name}, выберите действие:")
+        print("1. Атаковать ⚔️")
+        print("2. Специальная атака ⚡ (раз в 3 раунда)")
+        print("3. Защищаться 🛡️ (уменьшает урон в этом раунде)")
+        print("4. Использовать артефакт для лечения 💊")
+
+        choice = get_valid_input("Ваш выбор (1-4): ", ["1", "2", "3", "4"])
+
+        player_damage = 0
+        player_defending = False
+
+        if choice == "1":
+            player_damage = player.attack_enemy()
+            print(f"⚔️ {player.name} атакует и наносит {player_damage} урона!")
+
+        elif choice == "2":
+            player_damage = player.special_attack()
+            print(f"⚡ {player.name} наносит {player_damage} урона!")
+
+        elif choice == "3":
+            player_defending = True
+            player.defense += 5  # Временное увеличение защиты
+            print(f"🛡️ {player.name} занимает оборонительную позицию!")
+
+        elif choice == "4":
+            if len(player.artifacts) >= 2:
+                # Используем артефакт для лечения
+                heal_amount = 20 + len(player.artifacts) * 5
+                player.heal(heal_amount)
+                print(f"💊 {player.name} использует энергию артефактов и восстанавливает {heal_amount} здоровья!")
+                print(f"❤️ Теперь здоровье: {player.health}/{player.max_health}")
+            else:
+                print("⚠️ Нужно минимум 2 артефакта для лечения!")
+                continue
+
+        # Босс получает урон
+        if player_damage > 0:
+            actual_damage = boss.take_damage(player_damage)
+            print(f"💢 {boss.name} получает {actual_damage} урона!")
+
+        # Проверяем, побежден ли босс
+        if not boss.is_alive():
+            print(f"\n🎉 {boss.name} побежден!")
+            victory_ending()
+            return
+
+        # Ход босса
+        print(f"\nХод {boss.name}:")
+        boss_damage = boss.attack_player(player)
+
+        if player_defending:
+            print(f"🛡️ Защита снизила урон до {boss_damage}!")
+            player.defense -= 5  # Возвращаем защиту к исходному значению
+
+        print(f"💔 {player.name} получает {boss_damage} урона!")
+
+        # Проверяем, жив ли игрок
+        if not player.is_alive():
+            print(f"\n💀 {player.name} пал в бою...")
+            defeat_ending()
+            return
+
+        # Восстанавливаем специальную атаку каждые 3 раунда
+        if battle_round % 3 == 0:
+            player.reset_special()
+            print("✨ Специальная атака снова доступна!")
+
+        battle_round += 1
+
+        # Небольшая пауза между раундами
+        input("\nНажмите Enter чтобы продолжить...")
+
+
+def victory_ending():
+    print("\n" + "🎊" * 25)
+    print("🎊 ПОБЕДА! 🎊")
+    print("🎊" * 25)
+
+    # Разные концовки в зависимости от количества артефактов
+    if len(collected_items) >= 5:
+        ending = "Вы не только победили Хранителя Проклятия, но и собрали все древние артефакты. Остров процветает под вашим правлением как нового хранителя!"
+    elif len(collected_items) >= 3:
+        ending = "Победа над Хранителем сняла проклятие с острова. Вы находите корабль и возвращаетесь домой героем, унося с собой легендарные артефакты!"
+    else:
+        ending = "Вы победили Хранителя, но с малым количеством артефактов не смогли полностью снять проклятие. Остров начинает медленно восстанавливаться..."
+
+    log_move(f"Победа в финальной битве! Артефактов: {len(collected_items)}")
+    end_game(ending, True)
+
+
+def defeat_ending():
+    print("\n" + "💀" * 25)
+    print("💀 ПОРАЖЕНИЕ 💀")
+    print("💀" * 25)
+
+    ending = "Хранитель Проклятия оказался сильнее. Ваша неудача позволяет проклятию распространиться дальше. Остров навсегда остается во тьме..."
+
+    log_move("Поражение в финальной битве")
+    end_game(ending, False)
 
 
 def start_game():
@@ -333,10 +448,9 @@ def beach_choice():
     elif choice == "4":
         show_save_menu("beach")
     elif choice == "5":
-        if current_item and current_item not in start_items:
-            start_items.append(current_item)
+        return_items_to_pool()
         save_items()
-        print("📦 Предмет возвращен в копилку")
+        print("📦 Предметы возвращены в копилку")
 
 
 def jungle_path():
@@ -350,19 +464,15 @@ def jungle_path():
 
     print("\n1. Принять испытание")
     print("2. Отказаться и вернуться")
-    print("3. Искать другой путь")
-    print("4. Сохранить игру 💾")
+    print("3. Сохранить игру 💾")
 
-    choice = get_valid_input("Ваш выбор (1-4): ", ["1", "2", "3", "4"])
+    choice = get_valid_input("Ваш выбор (1-3): ", ["1", "2", "3"])
 
     if choice == "1":
         wisdom_test()
     elif choice == "2":
         safe_return("Вы отказались от испытания и вернулись на пляж")
     elif choice == "3":
-        # НОВОЕ ПЕРВОЕ ОТВЕТВЛЕНИЕ: Таинственная тропа
-        mysterious_path()
-    elif choice == "4":
         show_save_menu("jungle")
 
 
@@ -382,50 +492,6 @@ def wisdom_test():
         lose_item_to_spirit()
 
 
-# НОВОЕ ПЕРВОЕ ОТВЕТВЛЕНИЕ: Таинственная тропа
-def mysterious_path():
-    visited_locations.add("Таинственная тропа")
-    print("\n" + "=" * 30)
-    print("🛤️ ТАИНСТВЕННАЯ ТРОПА")
-    print("=" * 30)
-    print("Вы нашли скрытую тропу в джунглях...")
-    print("Она ведет к древнему камню с надписями.")
-
-    print("\n1. Прочитать надписи")
-    print("2. Обойти камень")
-    print("3. Вернуться назад")
-
-    choice = get_valid_input("Ваш выбор (1-3): ", ["1", "2", "3"])
-
-    if choice == "1":
-        print("\n📖 Надпись гласит: 'Тот, кто разгадает загадку ветра, найдет истинный путь.'")
-
-        if simple_riddle():
-            print("\n🌀 Ветер подхватывает вас и уносит в небо!")
-            print("Вы парите над островом и видите путь к спасению!")
-
-            # НОВАЯ КОНЦОВКА 1
-            end_game(
-                "Загадка ветра открыла вам секреты острова. Вы нашли древний летающий корабль и уплыли в закат, став легендой.",
-                True)
-        else:
-            print("\n💨 Ничего не происходит...")
-            mysterious_path()
-    elif choice == "2":
-        print("\nВы обходите камень и находите маленький сундук!")
-        if spirit_items:
-            item = random.choice(spirit_items)
-            spirit_items.remove(item)
-            collected_items.append(item)
-            print(f"✨ Вы нашли: {item}")
-            save_items()
-        else:
-            print("Но сундук пуст...")
-        mysterious_path()
-    elif choice == "3":
-        jungle_path()
-
-
 def temple_ruins():
     visited_locations.add("Руины храма")
     print("\n" + "=" * 30)
@@ -439,7 +505,7 @@ def temple_ruins():
             print(f"{i}. {item}")
 
         print(f"\n{len(spirit_items) + 1}. Не брать ничего")
-        print(f"{len(spirit_items) + 2}. Исследовать дальше храм")
+        print(f"{len(spirit_items) + 2}. Начать финальную битву ⚔️")
         print(f"{len(spirit_items) + 3}. Сохранить игру 💾")
         print(f"{len(spirit_items) + 4}. Вернуться на пляж")
 
@@ -451,17 +517,22 @@ def temple_ruins():
                 if 1 <= choice_num <= len(spirit_items):
                     selected = spirit_items.pop(choice_num - 1)
                     collected_items.append(selected)
+                    player.artifacts.append(selected)
                     log_move(f"Получен предмет духа: {selected}")
                     print(f"✨ Вы взяли: {selected}")
                     print("'Энергия острова усиливается...'")
                     save_items()
-                    final_choice()
+                    temple_ruins()
                 elif choice_num == len(spirit_items) + 1:
                     print("Вы ничего не берете...")
-                    final_choice()
+                    temple_ruins()
                 elif choice_num == len(spirit_items) + 2:
-                    # НОВОЕ ВТОРОЕ ОТВЕТВЛЕНИЕ: Секретная пещера
-                    secret_cave()
+                    # ФИНАЛЬНАЯ БИТВА
+                    if len(collected_items) >= 2:
+                        final_battle()
+                    else:
+                        print("⚠️ Нужно минимум 2 артефакта для битвы с Хранителем!")
+                        temple_ruins()
                 elif choice_num == len(spirit_items) + 3:
                     show_save_menu("temple")
                 elif choice_num == len(spirit_items) + 4:
@@ -478,51 +549,18 @@ def temple_ruins():
             temple_ruins()
     else:
         print("⚠️ Нет доступных предметов духа")
-        final_choice()
-
-
-# НОВОЕ ВТОРОЕ ОТВЕТВЛЕНИЕ: Секретная пещера
-def secret_cave():
-    visited_locations.add("Секретная пещера")
-    print("\n" + "=" * 30)
-    print("💎 СЕКРЕТНАЯ ПЕЩЕРА")
-    print("=" * 30)
-    print("За алтарем вы нашли скрытый проход...")
-    print("В пещере светятся кристаллы и стоит странный механизм.")
-
-    print("\n1. Изучить механизм")
-    print("2. Собрать кристаллы")
-    print("3. Вернуться в храм")
-
-    choice = get_valid_input("Ваш выбор (1-3): ", ["1", "2", "3"])
-
-    if choice == "1":
-        print("\n⚙️ Механизм имеет три кнопки с цифрами.")
-        print("На стене надпись: 'Только правильный выбор откроет истину.'")
-
-        if guess_number():
-            print("\n🔓 Механизм оживает! Стена отодвигается...")
-            print("За ней вы видите древний портал!")
-
-            # НОВАЯ КОНЦОВКА 2
-            end_game("Портал переносит вас в другое измерение. Вы становитесь хранителем древних знаний между мирами.",
-                     True)
+        # Предлагаем финальную битву
+        if len(collected_items) >= 2:
+            print("\n⚔️ Вы собрали все доступные артефакты!")
+            print("Готовы к финальной битве?")
+            choice = get_valid_input("Начать битву? (да/нет): ", ["да", "нет"])
+            if choice == "да":
+                final_battle()
+            else:
+                beach_choice()
         else:
-            print("\n🔒 Механизм не реагирует...")
-            secret_cave()
-    elif choice == "2":
-        print("\n💎 Вы собираете светящиеся кристаллы.")
-        if len(collected_items) < 3:
-            # Добавляем специальный кристалл
-            special_item = "💎 Сияющий кристалл"
-            collected_items.append(special_item)
-            print(f"✨ Вы получили: {special_item}")
-            print("Кристаллы наполняют вас энергией!")
-        else:
-            print("Но у вас уже слишком много предметов...")
-        secret_cave()
-    elif choice == "3":
-        temple_ruins()
+            print("⚠️ Нужно больше артефактов для финальной битвы!")
+            beach_choice()
 
 
 def cliffs_path():
@@ -540,13 +578,17 @@ def cliffs_path():
 
     if choice == "1":
         print("\nОтшельник говорит: 'Остров проклят древним заклинанием...'")
-        print("'Собери 3 ритуальных предмета для ритуала очищения.'")
-        if len(collected_items) >= 3:
-            print("✅ У вас достаточно предметов!")
-            perform_ritual()
-        else:
-            print(f"⚠️ У вас только {len(collected_items)} предмет(ов). Нужно больше!")
-            beach_choice()
+        print("'Собери артефакты и сразись с Хранителем в руинах храма!'")
+        print("'Каждый артефакт увеличит твою силу в битве.'")
+
+        # Отшельник может дать подсказку или небольшой бонус
+        if player and player.health < player.max_health:
+            heal_amount = 30
+            player.heal(heal_amount)
+            print(f"🧙 Отшельник делится с вами целебным зельем! +{heal_amount} здоровья")
+            print(f"❤️ Теперь здоровье: {player.health}/{player.max_health}")
+
+        cliffs_path()
     elif choice == "2":
         safe_return("Вы спустились с утесов")
     elif choice == "3":
@@ -588,6 +630,7 @@ def portal_challenge():
             guess = int(input(f"Попытка {attempt + 1}/{attempts}: "))
             if guess == secret_number:
                 print("🎉 Портал открывается!")
+                # Портал ведет прямо в храм
                 temple_ruins()
                 return
             else:
@@ -600,56 +643,19 @@ def portal_challenge():
 
 
 def lose_item_to_spirit():
-    if current_item in collected_items:
-        collected_items.remove(current_item)
-        spirit_items.append(current_item)
+    if collected_items:
+        lost_item = collected_items.pop()
+        spirit_items.append(lost_item)
+        if player and lost_item in player.artifacts:
+            player.artifacts.remove(lost_item)
         save_items()
-        log_move(f"Предмет потерян: {current_item}")
-        print(f"💨 {current_item} перешел к духам острова")
+        log_move(f"Предмет потерян: {lost_item}")
+        print(f"💨 {lost_item} перешел к духам острова")
 
     if not collected_items:
         end_game("Вы потеряли все предметы. Проклятие острова поглотило вас.", False)
     else:
         beach_choice()
-
-
-def perform_ritual():
-    print("\n" + "🔥" * 20)
-    print("🔥 ВЫПОЛНЕНИЕ РИТУАЛА 🔥")
-    print("🔥" * 20)
-    print("Отшельник помогает вам провести древний обряд...")
-
-    if len(collected_items) >= 3:
-        print("✨ Ритуал удался! Проклятие снято!")
-        end_game("Вы очистили остров от проклятия и нашли путь домой!", True)
-    else:
-        print("❌ Недостаточно сил для ритуала!")
-        beach_choice()
-
-
-def final_choice():
-    print("\n" + "=" * 30)
-    print("🌅 РЕШАЮЩИЙ ВЫБОР")
-    print("=" * 30)
-    print("1. Попытаться снять проклятие")
-    print("2. Построить плот и уплыть")
-    print("3. Остаться жить на острове")
-    print("4. Сохранить игру 💾")
-
-    choice = get_valid_input("Ваш выбор (1-4): ", ["1", "2", "3", "4"])
-
-    if choice == "1":
-        if len(collected_items) >= 3:
-            perform_ritual()
-        else:
-            print("⚠️ У вас недостаточно ритуальных предметов!")
-            beach_choice()
-    elif choice == "2":
-        end_game("Вы построили плот и уплыли с острова... но проклятие последовало за вами.", False)
-    elif choice == "3":
-        end_game("Вы приняли остров как свой дом и стали его хранителем.", True)
-    elif choice == "4":
-        show_save_menu("temple")
 
 
 def safe_return(message):
@@ -672,7 +678,10 @@ def end_game(outcome, success):
         print("❌ ВЫ ПОТЕРПЕЛИ НЕУДАЧУ")
 
     print(f"\n📍 Посещенные места: {', '.join(visited_locations)}")
-    print(f"📦 Собранные предметы: {', '.join(collected_items) if collected_items else 'нет'}")
+    print(f"📦 Собранные артефакты: {', '.join(collected_items) if collected_items else 'нет'}")
+
+    if player:
+        print(f"⚔️ Финальное здоровье: {player.health}/{player.max_health}")
 
     # Запись в файл
     with open("island_log.txt", "a", encoding="utf-8") as file:
@@ -682,6 +691,9 @@ def end_game(outcome, success):
             file.write(f"- {move}\n")
         file.write(f"Результат: {outcome}\n")
         file.write(f"Успех: {success}\n")
+        if player:
+            file.write(f"Финальное здоровье: {player.health}\n")
+            file.write(f"Артефактов собрано: {len(collected_items)}\n")
 
     print("\n📁 Результат записан в файл 'island_log.txt'")
 
@@ -696,18 +708,8 @@ def end_game(outcome, success):
         save_items()
         print("✅ Предметы сохранены для следующих игр!")
     else:
-        # Возвращаем все предметы обратно
-        for item in collected_items:
-            if item in ["🌊 Ракушка Приливов", "🔥 Огненный Кремень", "🌿 Лист Древнего Древа",
-                        "💎 Глаз Бури", "🐚 Рог Морского Царя", "🌙 Лунный Камень",
-                        "☀️ Солнечный Кристалл", "🌀 Перо Ветров"]:
-                if item not in start_items:
-                    start_items.append(item)
-            else:
-                if item not in spirit_items:
-                    spirit_items.append(item)
+        return_items_to_pool()
 
-        # Удаляем файл сохранения если он есть
         if os.path.exists("save_game.json"):
             os.remove("save_game.json")
 
