@@ -29,7 +29,7 @@ class Player:
             print(f"⚡ {self.name} использует специальную атаку!")
             return damage
         else:
-            print("⚠️ Специальная атака еще не готова!")
+            print(" Специальная атака еще не готова!")
             return self.attack_enemy()
 
     def reset_special(self):

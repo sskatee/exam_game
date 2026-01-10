@@ -17,7 +17,7 @@ class Boss:
         if self.health <= self.max_health // 2 and self.phase == 1:
             self.phase = 2
             self.attack += 5
-            print(f"🔥 {self.name} входит в ярость! Его атака усиливается!")
+            print(f" {self.name} входит в ярость! Его атака усиливается!")
 
         return actual_damage
 
@@ -32,10 +32,10 @@ class Boss:
 
         if attack_type == "strong":
             base_damage = int(base_damage * 1.5)
-            print(f"💥 {self.name} использует сильную атаку!")
+            print(f"{self.name} использует сильную атаку!")
         elif attack_type == "special" and self.phase == 2:
             base_damage = self.attack * 2
-            print(f"🌀 {self.name} использует разрушительную атаку!")
+            print(f" {self.name} использует разрушительную атаку!")
 
         return player.take_damage(base_damage)
 
