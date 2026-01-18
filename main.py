@@ -480,42 +480,44 @@ def wisdom_test():
         print("Дух доволен вашей мудростью!")
         rand_item=random.choice(spirit_items)
         print(f"\nДух дарит вам: {rand_item}")
+        spirit_items.remove(rand_item)
         coll_items.append(rand_item)
+
+        print(
+            "Вторая: 'Что может растрогать до слёз и воскресить мёртвого, прожить с тобой до конца дней или исчезнуть в мгновение?'")
+
+        ans = input("Ваш ответ: ").strip().lower()
+        log_move(f"Ответ на вторую загадку: {ans}")
+
+        if ans == "воспоминание":
+            print("Дух восхищен вами!")
+            rand_item = random.choice(spirit_items)
+            print(f"\nДух дарит вам: {rand_item}")
+            spirit_items.remove(rand_item)
+            coll_items.append(rand_item)
+
+            print("Третья: 'Что есть у каждого, но никто не может это потерять?'")
+
+            ans = input("Ваш ответ: ").strip().lower()
+            log_move(f"Ответ на третью загадку: {ans}")
+
+            if ans == "тень":
+                print("Дух преклоняется перед вами и позволяет выбрать награду!")
+                temple()
+            else:
+                print("Дух качает головой...")
+                print("Правильный ответ: 'тень'")
+                lose_item()
+
+        else:
+            print("Дух качает головой...")
+            print("Правильный ответ: 'воспоминание'")
+        lose_item()
 
     else:
         print("Дух качает головой...")
         print("Правильный ответ: 'обещание'/'молчание'/'слово'")
         lose_item()
-
-    print("Вторая: 'Что может растрогать до слёз и воскресить мёртвого, прожить с тобой до конца дней или исчезнуть в мгновение?'")
-
-    ans = input("Ваш ответ: ").strip().lower()
-    log_move(f"Ответ на вторую загадку: {ans}")
-
-    if ans == "воспоминание":
-        print("Дух восхищен вами!")
-        rand_item = random.choice(spirit_items)
-        print(f"\nДух дарит вам: {rand_item}")
-        coll_items.append(rand_item)
-
-    else:
-        print("Дух качает головой...")
-        print("Правильный ответ: 'обещание'/'молчание'/'слово'")
-        lose_item()
-
-    print("Третья: 'Что есть у каждого, но никто не может это потерять?'")
-
-    ans = input("Ваш ответ: ").strip().lower()
-    log_move(f"Ответ на третью загадку: {ans}")
-
-    if ans == "тень":
-        print("Дух преклоняется перед вами и позволяет выбрать награду!")
-        temple()
-    else:
-        print("Дух качает головой...")
-        print("Правильный ответ: 'тень'")
-        lose_item()
-
 
 
 def temple():
@@ -529,13 +531,12 @@ def temple():
         for i, item in enumerate(spirit_items, 1):
             print(f"{i}. {item}")
 
-        print(f"\n{len(spirit_items) + 1}. Не брать ничего")
-        print(f"{len(spirit_items) + 2}. Начать финальную битву")
-        print(f"{len(spirit_items) + 3}. Сохранить игру")
-        print(f"{len(spirit_items) + 4}. Вернуться на пляж")
+        print(f"{len(spirit_items) + 1}. Начать финальную битву")
+        print(f"{len(spirit_items) + 2}. Сохранить игру")
+        print(f"{len(spirit_items) + 3}. Вернуться на пляж")
 
         try:
-            choice = input(f"Выберите действие (1-{len(spirit_items) + 4}): ")
+            choice = input(f"Выберите действие (1-{len(spirit_items) + 3}): ")
 
             if choice.isdigit():
                 choice_num = int(choice)
@@ -548,9 +549,6 @@ def temple():
                     print("'Энергия острова усиливается...'")
                     save_items()
                     temple()
-                elif choice_num == len(spirit_items) + 1:
-                    print("Вы ничего не берете...")
-                    temple()
                 elif choice_num == len(spirit_items) + 2:
                     # ФИНАЛЬНАЯ БИТВА
                     if len(coll_items) >= 2:
@@ -558,9 +556,9 @@ def temple():
                     else:
                         print("Нужно минимум 2 артефакта для битвы с Хранителем!")
                         temple()
-                elif choice_num == len(spirit_items) + 3:
+                elif choice_num == len(spirit_items) + 2:
                     save_menu("temple")
-                elif choice_num == len(spirit_items) + 4:
+                elif choice_num == len(spirit_items) + 3:
                     beach()
                 else:
                     print("Неверный выбор!")
