@@ -357,7 +357,7 @@ def final_battle():
 
         if player_defending:
             print(f"Защита снизила урон до {boss_damage}!")
-            player.defense -= 5  # Возвращаем защиту к исходному значению
+            player.defense -= 5  # Возвращаем защиту к исходному  значению
 
         print(f"{player.name} получает {boss_damage} урона!")
 
@@ -548,8 +548,8 @@ def temple():
                     print(f"Вы взяли: {selected}")
                     print("'Энергия острова усиливается...'")
                     save_items()
-                    temple()
-                elif choice_num == len(spirit_items) + 2:
+                    safe_return("Вы вернулись на пляж")
+                elif choice_num == len(spirit_items) + 1:
                     # ФИНАЛЬНАЯ БИТВА
                     if len(coll_items) >= 2:
                         final_battle()
@@ -599,9 +599,44 @@ def cliffs():
     choice = get_valid_input("Ваш выбор (1-3): ", ["1", "2", "3"])
 
     if choice == "1":
-        print("\nОтшельник говорит: 'Остров проклят древним заклинанием...'")
-        print("'Собери артефакты и сразись с Хранителем в руинах храма!'")
-        print("'Каждый артефакт увеличит твою силу в битве.'")
+        print("\n Отшельник просит вашей помощи в расшифровке древних текстов:")
+        print("Помогите отшельнику составить слово из букв:'енизан'")
+
+        ans = input("Ваш ответ: ").strip().lower()
+        log_move(f"Ответ на первый вопрос: {ans}")
+
+        if ans == "знание":
+            print("Отшельник вам благодарен!")
+            rand_item = random.choice(spirit_items)
+            print(f"\nОтшельник дарит вам: {rand_item}")
+            spirit_items.remove(rand_item)
+            coll_items.append(rand_item)
+
+            print("Следующее слово:'мпреагтне'")
+
+            ans = input("Ваш ответ: ").strip().lower()
+            log_move(f"Ответ на второй вопрос: {ans}")
+
+            if ans == "пергамент":
+                print("Отшельник поражен вашей смекалкой!")
+                rand_item = random.choice(spirit_items)
+                print(f"\nОтшельник дарит вам: {rand_item}")
+                spirit_items.remove(rand_item)
+                coll_items.append(rand_item)
+                print("\nОтшельник говорит: 'Остров проклят древним заклинанием...'")
+                print("'Собери артефакты и сразись с Хранителем в руинах храма!'")
+                print("'Каждый артефакт увеличит твою силу в битве.'")
+                cliffs()
+            else:
+                print("Кажется, ответ неверный, отшельник в вас разочарован...")
+                print("Правильный ответ: 'пергамент'")
+                lose_item()
+
+        else:
+            print("Кажется, ответ неверный, отшельник в вас разочарован...")
+            print("Правильный ответ: 'знание'")
+            lose_item()
+
 
         # Отшельник может дать подсказку или небольшой бонус
         if player and player.health < player.max_health:
@@ -609,8 +644,8 @@ def cliffs():
             player.heal(heal_amount)
             print(f"Отшельник делится с вами целебным зельем! +{heal_amount} здоровья")
             print(f"Теперь здоровье: {player.health}/{player.max_health}")
+            cliffs()
 
-        cliffs()
     elif choice == "2":
         safe_return("Вы спустились с утесов")
     elif choice == "3":
